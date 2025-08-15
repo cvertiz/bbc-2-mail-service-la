@@ -1,0 +1,44 @@
+pipeline {
+    agent any
+    tools {
+        nodejs 'node'
+    }
+    stages {
+        stage('Read working directory') {
+            steps {
+                script {
+                    sh 'ls'
+                }
+            }
+        }
+        stage('Check node version') {
+            steps {
+                script {
+                    sh 'node --version'
+                    sh 'npm --version'
+                }
+            }
+        }
+        stage('Dependency Installation') {
+            steps {
+                script {
+                    sh 'npm install'
+                }
+            }
+        }
+        stage('Testing') {
+            steps {
+                script {
+                    sh 'npm run test'
+                }
+            }
+        }
+        stage('Coverage') {
+            steps {
+                script {
+                    sh 'npm run test-coverage'
+                }
+            }
+        }
+    }
+}

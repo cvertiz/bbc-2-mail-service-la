@@ -4,9 +4,29 @@
   "description": "",
   "main": "index.js",
   "type": "module",
+  "scripts": {
+    "dev": "nodemon ./src/index.js",
+    "clean": "rm app.zip",
+    "test": "jest",
+    "test-coverage": "jest --coverage"
+  },
+  "author": "",
+  "license": "ISC",
   "dependencies": {
-    "@aws-sdk/client-secrets-manager": "^3.864.0",
-    "dotenv": "^16.4.5",
-    "pg": "^8.16.3"
+    "@aws-sdk/client-secrets-manager": "^3.499.0",
+    "@aws-sdk/client-sns": "^3.515.0",
+    "@aws-sdk/client-sqs": "^3.596.0",
+    "axios": "^1.6.8",
+    "dotenv": "^17.2.1",
+    "exceljs": "^4.4.0",
+    "imapflow": "^1.0.194",
+    "mailparser": "^3.7.4",
+    "pg": "^8.11.3"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.23.9",
+    "@babel/preset-env": "^7.23.9",
+    "babel-jest": "^29.7.0",
+    "jest": "^29.7.0"
   }
 }

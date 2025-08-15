@@ -1,76 +1,45 @@
-// require('dotenv').config();
-// const steps = require('./src/Steps');
+import 'dotenv/config'; 
+import { createConnection } from "./config/DbConnection.js";
+import { processBestSecret } from "./service/BestSecret.js";
+import { processBrandAlley } from "./service/BrandAlley.js";
+import { processRequest } from "./service/BusinessService.js";
+import { processRequestSecret } from "./service/SecretSales.js";
+import { buildEmptyOkResponse, buildErrorResponse } from "./utils/Utils.js";
+import { listEmails } from "./service/MailService.js";
 
-
-// exports.handler = async (event) => {
-
-//     /**CARGAR VARIABLES DE ENTORNO */
-
-//     const AMBIENTE = process.env.AMBIENTE;
-
-//     console.info("VARIABLES DE ENTORNO:");
-//     console.info("AMBIENTE:" + AMBIENTE);
-
-
-
-//     if (!event.body) {
-
-
-//         const response = {
-//             statusCode: 500,
-//             headers: { 'Content-Type': 'application/json' },
-//             body: '{"error":"No hay body"}',
-//         };
-//         return response;
-//     } else {
-
-//         steps.logging("AMBIENTE",AMBIENTE);
-//         return {
-//             headers: {
-//                 'Content-Type': 'application/json'
-//             },
-//             statusCode: 200,
-//             body: JSON.stringify({'Ambiente':  AMBIENTE})
-//         };
-
-//     }
-// };
-
-import {
-    createConnection
-} from "./config/DbConnection.js";
-import {
-    buildEmptyOkResponse,
-    buildErrorResponse
-} from "./utils/Utils.js";
 export const handler = async (event, context, callback) => {
-    try {
-        await createConnection();
+  try {
+    await createConnection();
 
-        // await processRequest();
-        // await processRequestSecret();
-        // await processBrandAlley();
-        // await processBestSecret();
-        console.log("Request processed successfully");
-        return buildEmptyOkResponse();
-    } catch (error) {
-        console.log(error);
-        return buildErrorResponse(error);
-    }
+    const result = await listEmails({
+      mailbox: 'INBOX',
+      limit: 10,
+      markSeen: false,
+      filters: {},
+    });
+
+    return {
+      statusCode: 200,
+      body: JSON.stringify(result, null, 2)
+    };
+    
+    return buildEmptyOkResponse();
+  } catch (error) {
+    console.log(error);
+    return buildErrorResponse(error);
+  }
 };
 
+(async () => {
+  await handler(null, null, null);
+})();
+
+// let resp = handler({
+//   "body": `{"nombre":"Juan","apellido":"Perez"}`
+// });
 
 
 
-/****** TEST LOCAL ******/
-
-
-let resp = handler({
-    "body": `{"nombre":"Juan","apellido":"Perez"}`
-});
-
-
-
-resp.then((data) => {
-    console.info("Respuesta del Lambda:" + JSON.stringify(data));
-});
+// resp.then((data) => {
+//   console.info("Respuesta del Lambda:" + JSON.stringify(data));
+// });

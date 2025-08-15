@@ -1,0 +1,46 @@
+[
+  {
+    "ParameterKey": "FUNCTIONNAME",
+    "ParameterValue": "bbc-shop-premiun-outlet-job-la"
+  },
+  {
+    "ParameterKey": "HANDLER",
+    "ParameterValue": "src/index.handler"
+  },
+  {
+    "ParameterKey": "LAMBDAROLE",
+    "ParameterValue": "arn:aws:iam::418334950001:role/bbc-lambda-role"
+  },
+  {
+    "ParameterKey": "S3BUCKET",
+    "ParameterValue": "infra-code-base"
+  },
+  {
+    "ParameterKey": "SRCCODE",
+    "ParameterValue": "<PACKAGE_DIRECTION>"
+  },
+  {
+    "ParameterKey": "PGDB",
+    "ParameterValue": "bbc_db_dev"
+  },
+  {
+    "ParameterKey": "SMSECRET",
+    "ParameterValue": "rds-db-secrets"
+  },
+  {
+    "ParameterKey": "EVENTBRIDGE",
+    "ParameterValue": "bbc-shop-premiun-outlet-job-eb"
+  },
+  {
+    "ParameterKey": "SNSTOPIC",
+    "ParameterValue": "bbc-shop-premiun-outlet-sns"
+  },
+  {
+    "ParameterKey": "SQSNAME",
+    "ParameterValue": "bbc-shop-premiun-outlet-sqs"
+  },
+  {
+    "ParameterKey": "SQSPULL",
+    "ParameterValue": "https://sqs.us-east-2.amazonaws.com/418334950001/bbc-pull-marketplaces-sqs"
+  }
+]

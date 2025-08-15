@@ -1,0 +1,118 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Node sample lambda
+Parameters:
+  FUNCTIONNAME:
+    Type: String
+    Description: function name in lambda service
+  HANDLER:
+    Type: String
+    Description: handler location in project
+  LAMBDAROLE:
+    Type: String
+    Description: aws iam role
+  S3BUCKET:
+    Type: String
+    Description: s3 bucket where code is
+  SRCCODE:
+    Type: String
+    Description: file location in s3 bucket
+  PGDB:
+    Type: String
+    Description: database id
+  SMSECRET:
+    Type: String
+    Description: secret manager secret id
+  SNSTOPIC:
+    Type: String
+    Description: sns topic name
+  SQSNAME:
+    Type: String
+    Description: sqs name
+  SQSPULL:
+    Type: String
+    Description: sqs pull url
+  EVENTBRIDGE:
+    Type: String
+    Description: event bridge name id
+Resources:
+  ##SNS TOPIC
+  SNSTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      DisplayName: !Ref SNSTOPIC
+  ##SQS QUEUE
+  SQSQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Ref SQSNAME
+      VisibilityTimeout: 43200
+  ##SNS Subscription
+  SNSSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref SNSTopic
+      Protocol: sqs
+      Endpoint: !GetAtt SQSQueue.Arn
+  ##EVENT BRIDGE RULE
+  EventBridgeRule:
+    Type: "AWS::Events::Rule"
+    Properties:
+      Name: !Ref EVENTBRIDGE
+      ScheduleExpression: "rate(5 minutes)"
+      State: "ENABLED"
+      Targets:
+        - Arn: !GetAtt LambdaFunction.Arn
+          Id: !Ref EVENTBRIDGE
+  ##PERMISOS LAMBDA
+  LambdaPermissionEventBridge:
+    Type: "AWS::Lambda::Permission"
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt LambdaFunction.Arn
+      Principal: events.amazonaws.com
+      SourceArn: !GetAtt EventBridgeRule.Arn
+  ##LAMBDA FUNCTION
+  LambdaFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: !Ref FUNCTIONNAME
+      Handler: !Ref HANDLER
+      Runtime: nodejs20.x
+      MemorySize: 512
+      Timeout: 250
+      Environment:
+        Variables:
+          PGDB: !Ref PGDB
+          SMSECRET: !Ref SMSECRET
+          SQSPULL: !Ref SQSPULL
+      CodeUri:
+        Bucket: !Ref S3BUCKET
+        Key: !Ref SRCCODE
+      Tracing: Active
+      Role: !Ref LAMBDAROLE
+      Events:
+        SQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt SQSQueue.Arn
+  MySQSQueuePolicy:
+    Type: "AWS::SQS::QueuePolicy"
+    Properties:
+      Queues:
+        - Ref: SQSQueue
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: sns.amazonaws.com
+            Action: SQS:SendMessage
+            Resource:
+              Fn::GetAtt:
+                - SQSQueue
+                - Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn:
+                  Ref: SNSTopic

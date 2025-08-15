@@ -1,0 +1,108 @@
+pipeline {
+    agent any
+    tools {
+        nodejs 'node'
+    }
+    stages {
+        stage('Read working directory') {
+            when {
+                expression { return params.deleted == false && params.created == false }
+            }
+            steps {
+                script {
+                    sh 'ls'
+                }
+            }
+        }
+        stage('Check node version') {
+            when {
+                expression { return params.deleted == false && params.created == false }
+            }
+            steps {
+                script {
+                    sh 'node --version'
+                    sh 'npm --version'
+                }
+            }
+        }
+        stage('Dependency Installation') {
+            when {
+                expression { return params.deleted == false && params.created == false }
+            }
+            steps {
+                script {
+                    sh 'npm install'
+                }
+            }
+        }
+        stage('Package') {
+            when {
+                expression { return params.deleted == false && params.created == false }
+            }
+            steps {
+                script {
+                    def build_name = "${params.repository_name}_${params.commit_sha}"
+                    sh "zip -r ${build_name}.zip *"
+                }
+            }
+        }
+        stage('Deploy S3') {
+            when {
+                expression { return params.deleted == false && params.created == false }
+            }
+            steps {
+                script{
+                    def build_name = "${params.repository_name}_${params.commit_sha}.zip"
+                    def repo = params.repository_name
+                    def target_bucket = "s3://infra-code-base/$repo/"
+                    withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-growbiz',
+                    accessKetVariable: 'AWS_ACCESS_KEY_ID',
+                    secreteKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                    ]]) {
+                        sh "aws s3 cp ${build_name} ${target_bucket}"
+                        echo "${target_bucket}"
+                        echo "Build generated with the name -> ${params.repository_name}_${params.commit_sha}"
+                        
+                    }
+                }
+            }
+        }
+        stage('Deploy CloudFormation') {
+            when {
+                expression { return params.deleted == false && params.created == false }
+            }
+                steps {
+                    script{
+                        def stack = params.repository_name
+                        def build_name = "${params.repository_name}_${params.commit_sha}.zip"
+                        def package_direction = "${params.repository_name}/${build_name}"
+                        withCredentials([[
+                        $class: 'AmazonWebServicesCredentialsBinding',
+                        credentialsId: 'aws-growbiz',
+                        accessKetVariable: 'AWS_ACCESS_KEY_ID',
+                        secreteKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                        ]]) {
+                            dir("src/cloudformation"){
+                                sh "ls"
+                                def fileContent = readFile("parameters-dev.json").trim()
+                                def new_file_content = fileContent.replace('<PACKAGE_DIRECTION>', package_direction)
+                                writeFile(file: "parameters-dev.json", text: new_file_content)
+                                sh "aws cloudformation deploy --template-file template.yaml --stack-name ${stack} --parameter-overrides file://parameters-dev.json --capabilities CAPABILITY_NAMED_IAM --region us-east-2"
+                            }   
+                        }
+
+                        
+                    }
+                    cleanWs()
+                
+                }
+        }
+    }
+    post {
+        always {
+           cleanWs()
+        }
+    }
+}

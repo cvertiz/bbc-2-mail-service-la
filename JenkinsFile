@@ -1,0 +1,95 @@
+pipeline {
+    agent any
+    tools {
+        nodejs 'node'
+    }
+    stages {
+        stage('Read working directory') {
+              when {
+                  expression { return params.current_status == "closed" && params.merged == true }
+              }
+            steps {
+                script {
+                    sh 'ls'
+                }
+            }
+        }
+        stage('Check node version') {
+              when {
+                  expression { return params.current_status == "closed" && params.merged == true }
+              }
+            steps {
+                script {
+                    sh 'node --version'
+                    sh 'npm --version'
+                }
+            }
+        }
+        stage('Dependency Installation') {
+              when {
+                  expression { return params.current_status == "closed" && params.merged == true }
+              }
+            steps {
+                script {
+                    sh 'npm install'
+                }
+            }
+        }
+        stage('Testing') {
+              when {
+                  expression { return params.current_status == "closed" && params.merged == true }
+              }
+            steps {
+                script {
+                    sh 'npm run test'
+                }
+            }
+        }
+        stage('Coverage') {
+              when {
+                  expression { return params.current_status == "closed" && params.merged == true }
+              }
+            steps {
+                script {
+                    sh 'npm run test-coverage'
+                }
+            }
+        }
+        stage('Package') {
+              when {
+                  expression { return params.current_status == "closed" && params.merged == true }
+              }
+            steps {
+                script {
+                    def build_name = "${params.repository_name}_${params.sha}"
+                    sh "zip -r ${build_name}.zip *"
+                }
+            }
+        }
+        stage('Deploy S3') {
+            when {
+                  expression { return params.current_status == "closed" && params.merged == true }
+              }
+            steps {
+                script{
+                    def build_name = "${params.repository_name}_${params.sha}.zip"
+                    def repo = params.repository_name
+                    def target_bucket = "s3://infra-code-base/$repo/"
+                    withCredentials([[
+                    $class: 'AmazonWebServicesCredentialsBinding',
+                    credentialsId: 'aws-growbiz',
+                    accessKetVariable: 'AWS_ACCESS_KEY_ID',
+                    secreteKeyVariable: 'AWS_SECRET_ACCESS_KEY'
+                    ]]) {
+                        sh "aws s3 cp ${build_name} ${target_bucket}"
+                        echo "${target_bucket}"
+                        echo "Build generated with the name -> ${params.repository_name}_${params.sha}"
+                        
+                    }
+                }
+                cleanWs()
+                
+            }
+        }
+    }
+}

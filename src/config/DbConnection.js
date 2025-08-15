@@ -21,16 +21,15 @@ export async function createConnection() {
       //   },
       // });
       let client = new pg.Client({
-        host:
-          process.env.DB_HOST ||
+        host: process.env.DB_HOST ||
           "rds-prd-eu.creymue0st6l.eu-west-1.rds.amazonaws.com",
-          port: Number(process.env.DB_PORT) || 5432,
-          user: process.env.DB_USER || "masterbbc",
-          password: process.env.DB_PASSWORD || "Gr0wb1zPRDM39kdu4",
-          database: process.env.DB_NAME || "bbc_tp_qa",
-          ssl: {
-            rejectUnauthorized: false
-          },
+        port: Number(process.env.DB_PORT) || 5432,
+        user: process.env.DB_USER || "masterbbc",
+        password: process.env.DB_PASSWORD || "Gr0wb1zPRDM39kdu4",
+        database: process.env.DB_NAME || "bbc_tp_qa",
+        ssl: {
+          rejectUnauthorized: false
+        },
       });
       await client.connect();
       ConnectionInstance = client;
