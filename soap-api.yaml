@@ -1,0 +1,149 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  gbzapp001sjp:
+    Type: 'AWS::Lambda::Function'
+    Properties: 
+      Handler: index.handler
+      Role: 
+        Fn::GetAtt: 
+          - LambdaExecutionRole
+          - Arn
+      Code: 
+        ZipFile: |
+        
+          exports.handler = async (event) => {
+               
+
+              const response = {
+                  statusCode: 200,
+                  headers: { 'Content-Type': 'application/json' },
+                  body: 'Lambda Ok',
+              };
+              return response;
+          };
+      Runtime: nodejs20.x
+      Timeout: 30
+      Environment:
+        Variables:
+          AMBIENTE: 'DEV'
+  LambdaExecutionRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: 'Allow'
+            Principal:
+              Service: 'lambda.amazonaws.com'
+            Action: 'sts:AssumeRole'
+      Policies:
+        - PolicyName: 'lambda-execution-policy'
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: 'Allow'
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource: 'arn:aws:logs:*:*:*'
+
+  ApiGatewayRestApi:
+    Type: 'AWS::ApiGateway::RestApi'
+    Properties:
+      Name: 'gbzapi001sjp'
+
+  ApiGatewayResource:
+    Type: 'AWS::ApiGateway::Resource'
+    Properties:
+      ParentId: 
+        Fn::GetAtt: 
+          - ApiGatewayRestApi
+          - RootResourceId
+      PathPart: 'producto'
+      RestApiId: 
+        Ref: 'ApiGatewayRestApi'
+
+  ApiGatewayMethodPost:
+    Type: 'AWS::ApiGateway::Method'
+    Properties:
+      AuthorizationType: 'NONE'
+      HttpMethod: 'POST'
+      ResourceId: 
+        Ref: 'ApiGatewayResource'
+      RestApiId: 
+        Ref: 'ApiGatewayRestApi'
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: 'AWS_PROXY'
+        Uri: 
+          Fn::Sub: 
+            - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations'
+            - LambdaArn: 
+                Fn::GetAtt: 
+                  - gbzapp001sjp
+                  - Arn
+        IntegrationResponses: 
+          - StatusCode: 200
+      MethodResponses: 
+        - StatusCode: 200
+
+  ApiGatewayMethodGet:
+    Type: 'AWS::ApiGateway::Method'
+    Properties:
+      AuthorizationType: 'NONE'
+      HttpMethod: 'GET'
+      ResourceId: 
+        Ref: 'ApiGatewayResource'
+      RestApiId: 
+        Ref: 'ApiGatewayRestApi'
+      Integration:
+        IntegrationHttpMethod: 'POST'
+        Type: 'AWS_PROXY'
+        Uri: 
+          Fn::Sub: 
+            - 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations'
+            - LambdaArn: 
+                Fn::GetAtt: 
+                  - gbzapp001sjp
+                  - Arn
+        IntegrationResponses: 
+          - StatusCode: 200
+      MethodResponses: 
+        - StatusCode: 200
+
+  ApiGatewayDeployment:
+    Type: 'AWS::ApiGateway::Deployment'
+    Properties:
+      RestApiId: 
+        Ref: 'ApiGatewayRestApi'
+      StageName: 'prod'
+    DependsOn: 
+      - ApiGatewayMethodPost
+      - ApiGatewayMethodGet
+
+  LambdaInvokePermission:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: 
+        Ref: 'gbzapp001sjp'
+      Principal: 'apigateway.amazonaws.com'
+      SourceArn: 
+        Fn::Sub: 
+          - 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiId}/*/POST/soap'
+          - ApiId: 
+              Ref: 'ApiGatewayRestApi'
+
+  LambdaInvokePermissionGet:
+    Type: 'AWS::Lambda::Permission'
+    Properties:
+      Action: 'lambda:InvokeFunction'
+      FunctionName: 
+        Ref: 'gbzapp001sjp'
+      Principal: 'apigateway.amazonaws.com'
+      SourceArn: 
+        Fn::Sub: 
+          - 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiId}/*/GET/soap'
+          - ApiId: 
+              Ref: 'ApiGatewayRestApi'
