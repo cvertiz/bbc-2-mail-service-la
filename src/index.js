@@ -1,11 +1,26 @@
-import 'dotenv/config'; 
-import { createConnection } from "./config/DbConnection.js";
-import { processBestSecret } from "./service/BestSecret.js";
-import { processBrandAlley } from "./service/BrandAlley.js";
-import { processRequest } from "./service/BusinessService.js";
-import { processRequestSecret } from "./service/SecretSales.js";
-import { buildEmptyOkResponse, buildErrorResponse } from "./utils/Utils.js";
-import { listEmails } from "./service/MailService.js";
+import 'dotenv/config';
+import {
+  createConnection
+} from "./config/DbConnection.js";
+import {
+  processBestSecret
+} from "./service/BestSecret.js";
+import {
+  processBrandAlley
+} from "./service/BrandAlley.js";
+import {
+  processRequest
+} from "./service/BusinessService.js";
+import {
+  processRequestSecret
+} from "./service/SecretSales.js";
+import {
+  buildEmptyOkResponse,
+  buildErrorResponse
+} from "./utils/Utils.js";
+import {
+  listEmails
+} from "./service/MailService.js";
 
 export const handler = async (event, context, callback) => {
   try {
@@ -15,14 +30,18 @@ export const handler = async (event, context, callback) => {
       mailbox: 'INBOX',
       limit: 10,
       markSeen: false,
-      filters: {},
+      filters: {
+        from: process.env.MAIL_FROM || '',
+        // subject: 'Notification de connexion', // LIKE %Notification de connexion%
+        unseen: true
+      },
     });
 
     return {
       statusCode: 200,
       body: JSON.stringify(result, null, 2)
     };
-    
+
     return buildEmptyOkResponse();
   } catch (error) {
     console.log(error);
