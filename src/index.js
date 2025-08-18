@@ -31,8 +31,8 @@ export const handler = async (event, context, callback) => {
       limit: 10,
       markSeen: false,
       filters: {
-        from: process.env.MAIL_FROM || '',
-        // subject: 'Notification de connexion', // LIKE %Notification de connexion%
+        from: process.env.FILTER_FROM || '',
+        subject: process.env.FILTER_SUBJECT || '', // LIKE %Your Item Has Sold!
         unseen: true
       },
     });
