@@ -3,30 +3,22 @@ import {
   createConnection
 } from "./config/DbConnection.js";
 import {
-  processBestSecret
-} from "./service/BestSecret.js";
-import {
-  processBrandAlley
-} from "./service/BrandAlley.js";
-import {
-  processRequest
-} from "./service/BusinessService.js";
-import {
-  processRequestSecret
-} from "./service/SecretSales.js";
+  searchEmailUids,
+  fetchBodiesByUids
+} from './service/MailService.js';
+
 import {
   buildEmptyOkResponse,
   buildErrorResponse
 } from "./utils/Utils.js";
-import {
-  listEmails
-} from "./service/MailService.js";
 
 export const handler = async (event, context, callback) => {
   try {
     await createConnection();
 
-    const result = await listEmails({
+    const {
+      uids
+    } = await searchEmailUids({
       mailbox: 'INBOX',
       limit: 10,
       markSeen: false,
@@ -37,12 +29,15 @@ export const handler = async (event, context, callback) => {
       },
     });
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify(result, null, 2)
-    };
-
-    return buildEmptyOkResponse();
+    // 2) Con esos UIDs, trae cada body
+    const {
+      messages
+    } = await fetchBodiesByUids({
+      uids,
+      mailbox: 'INBOX',
+      markSeen: false // no los marques como leídos
+    });
+    console.log("messages: ", messages);
   } catch (error) {
     console.log(error);
     return buildErrorResponse(error);
