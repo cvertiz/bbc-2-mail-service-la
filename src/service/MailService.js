@@ -119,7 +119,8 @@ export async function fetchBodiesByUids({
                 })) {
                     const parsed = await simpleParser(msg.source);
                     const totalEarningsUSD = extractTotalEarningsUSD(parsed.text, parsed.html);
-
+                    const itemReference = extractItemReference(parsed.text, parsed.html);
+                    const countryCode = extractCountryCode(parsed.text, parsed.html);
 
                     messages.push({
                         uid: msg.uid,
@@ -132,6 +133,8 @@ export async function fetchBodiesByUids({
                             html: parsed.html || null
                         },
                         totalEarningsUSD,
+                        itemReference,
+                        countryCode,
                         flags: Array.isArray(msg.flags) ? [...msg.flags] : [...(msg.flags || [])],
                         attachments: (parsed.attachments || []).map(a => ({
                             filename: a.filename,
@@ -151,18 +154,14 @@ export async function fetchBodiesByUids({
                 const byUid = new Map(messages.map(m => [m.uid, m]));
                 const ordered = uids.map(u => byUid.get(u)).filter(Boolean);
 
-                const totales = messages.map(m => ({
-                    uid: m.uid,
-                    total: m.totalEarningsUSD // número, p. ej. 412.13
-                }));
-                console.log("totales: ",totales);
-
                 return {
                     host,
                     mailbox,
                     count: ordered.length,
                     messages: ordered.map(m => ({
                         uid: m.uid,
+                        itemReference: m.itemReference,
+                        countryCode: m.countryCode,
                         total: m.totalEarningsUSD
                     }))
                 };
@@ -179,6 +178,85 @@ export async function fetchBodiesByUids({
 }
 
 // utils/extractTotalEarningsUSD.js
+export function extractItemReference(bodyText, bodyHtml) {
+    // Normaliza a texto plano
+    const plain = (bodyText && bodyText.trim().length) ?
+        bodyText :
+        (bodyHtml ? bodyHtml.replace(/<[^>]+>/g, ' ') : '');
+    if (!plain) return null;
+
+    // Busca "Item Reference:" (tolera saltos de línea y espacios)
+    // Ej: "Item Reference:\nABB4838" → devuelve ABB4838
+    const re = /Item\s*Reference\s*:?\s*([\r\n\t ]*)([A-Za-z0-9][A-Za-z0-9\-_.\/]*)/i;
+    const m = plain.match(re);
+    return m ? m[2] : null;
+}
+
+export function extractCountryCode(bodyText, bodyHtml) {
+    // Convierte a texto plano
+    const plain = (bodyText && bodyText.trim().length) ?
+        bodyText :
+        (bodyHtml ? bodyHtml.replace(/<[^>]+>/g, ' ') : '');
+    if (!plain) return null;
+
+    // Aísla el bloque SHIPPING DETAILS
+    const lower = plain.toLowerCase();
+    const startIdx = lower.indexOf('shipping details');
+    const scoped = startIdx !== -1 ? plain.slice(startIdx) : plain;
+
+    const endMarkers = ['price details', 'shipping instructions', 'get label', 'more questions', 'contact support'];
+    let endIdx = scoped.length;
+    for (const m of endMarkers) {
+        const i = scoped.toLowerCase().indexOf(m);
+        if (i !== -1) endIdx = Math.min(endIdx, i);
+    }
+    const block = scoped.slice(0, endIdx);
+
+    // Toma la última línea no vacía como candidato a país
+    const lines = block.split(/\r?\n+/).map(s => s.trim()).filter(Boolean);
+    if (lines.length && /^shipping details$/i.test(lines[0])) lines.shift();
+    if (!lines.length) return null;
+
+    let candidate = lines[lines.length - 1].replace(/[,.;]+$/g, '').trim();
+
+    // Si ya es un código de 2 letras en mayúsculas, úsalo
+    if (/^[A-Z]{2}$/.test(candidate)) return candidate;
+
+    // Mapeo común nombre → ISO-2
+    const map = {
+        'us': 'US',
+        'usa': 'US',
+        'u.s.': 'US',
+        'u.s.a.': 'US',
+        'united states': 'US',
+        'united states of america': 'US',
+        'united kingdom': 'GB',
+        'uk': 'GB',
+        'great britain': 'GB',
+        'england': 'GB',
+        'canada': 'CA',
+        'france': 'FR',
+        'germany': 'DE',
+        'deutschland': 'DE',
+        'spain': 'ES',
+        'españa': 'ES',
+        'italy': 'IT',
+        'italia': 'IT',
+        'mexico': 'MX',
+        'méxico': 'MX',
+        'peru': 'PE',
+        'perú': 'PE',
+        'australia': 'AU'
+    };
+    console.log("candidate: ", candidate);
+
+    const normalized = candidate.toLowerCase();
+    console.log("normalized: ", normalized);
+    console.log("map: ", map);
+    return map[normalized] || null;
+}
+
+
 export function extractTotalEarningsUSD(bodyText, bodyHtml) {
     // 1) Normaliza a texto plano
     const plain = (bodyText && bodyText.trim().length) ?

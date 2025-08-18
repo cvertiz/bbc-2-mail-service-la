@@ -6,6 +6,9 @@ import {
   searchEmailUids,
   fetchBodiesByUids
 } from './service/MailService.js';
+import {
+  processOrder
+} from './service/OrderService.js';
 
 import {
   buildEmptyOkResponse,
@@ -38,6 +41,17 @@ export const handler = async (event, context, callback) => {
       markSeen: false // no los marques como leídos
     });
     console.log("messages: ", messages);
+
+    if (messages.length > 0) {
+      for (let i = 0; i < messages.length; i++) {
+        console.log(`Procesando orden ${i + 1} de ${messages.length}:`, messages[i]);
+        try {
+          processOrder(messages[i]);
+        } catch (error) {
+          console.error(`Error al insertar orden ${i + 1}:`, error);
+        }
+      }
+    } else {}
   } catch (error) {
     console.log(error);
     return buildErrorResponse(error);
