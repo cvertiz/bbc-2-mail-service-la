@@ -97,33 +97,48 @@ async function getDataFromLocation(country, marketplaceId) {
     }
 }
 
+const getExchangeRate = async (fromCurrency, toCurrency) => {
+    //console.log(`from ${fromCurrency} to ${toCurrency}`)
+    if (fromCurrency === toCurrency) {
+        return 1;
+    } else {
+        const query = `
+    SELECT exchange_rate_value
+    FROM business.exchange_rate
+    WHERE currency_code_from = $1
+      AND currency_code_to = $2
+      AND status_code = 'A';
+  `;
+        const result = await ConnectionInstance.query(query, [
+            fromCurrency,
+            toCurrency,
+        ]);
+
+        return result.rows[0].exchange_rate_value;
+    }
+};
+
 export async function processOrder(order) {
     const marketplaceId = await getMarketplaceId();
-    console.log("marketplaceId: ", marketplaceId);
-    console.log("order: ", order);
     const country_code = order.countryCode ?? null;
-    console.log("country_code: ", country_code);
     const resultCountryData = await getCountryData(country_code);
-    console.log("resultCountryData: ", resultCountryData);
     const country_name = resultCountryData ?
         resultCountryData.country_name_en :
         null;
-    console.log("country_name: ", country_name);
 
     const oResultLocation = await getDataFromLocation(
         country_name,
         marketplaceId
     );
-    console.log("oResultLocation: ", oResultLocation);
     const locationCardCode = oResultLocation ? oResultLocation.card_code : null;
     const locationVat = oResultLocation ? oResultLocation.vat : null;
-    console.log("locationCardCode: ", locationCardCode);
-    console.log("locationVat: ", locationVat);
 
-    //     const currency = order.currency_iso_code;
+    const currency = order.currency_iso_code;
 
-    //     const exchange_currency_to_eur = await getExchangeRate("EUR", currency);
-    //     const exchange_to_usd = await getExchangeRate("EUR", "USD");
+    const exchange_currency_to_eur = await getExchangeRate("EUR", currency);
+    const exchange_to_usd = await getExchangeRate("EUR", "USD");
+    console.log("exchange_currency_to_eur: ", exchange_currency_to_eur);
+    console.log("exchange_to_usd: ", exchange_to_usd);
 
     //     console.log("order.customer: ", order.customer);
     //     console.log(

@@ -118,9 +118,12 @@ export async function fetchBodiesByUids({
                     source: true
                 })) {
                     const parsed = await simpleParser(msg.source);
-                    const totalEarningsUSD = extractTotalEarningsUSD(parsed.text, parsed.html);
                     const itemReference = extractItemReference(parsed.text, parsed.html);
                     const countryCode = extractCountryCode(parsed.text, parsed.html);
+                    const {
+                        amount,
+                        currency
+                    } = extractTotalEarnings(parsed.text, parsed.html);
 
                     messages.push({
                         uid: msg.uid,
@@ -132,9 +135,10 @@ export async function fetchBodiesByUids({
                             text: parsed.text || null,
                             html: parsed.html || null
                         },
-                        totalEarningsUSD,
                         itemReference,
                         countryCode,
+                        amount,
+                        currency,
                         flags: Array.isArray(msg.flags) ? [...msg.flags] : [...(msg.flags || [])],
                         attachments: (parsed.attachments || []).map(a => ({
                             filename: a.filename,
@@ -162,7 +166,8 @@ export async function fetchBodiesByUids({
                         uid: m.uid,
                         itemReference: m.itemReference,
                         countryCode: m.countryCode,
-                        total: m.totalEarningsUSD
+                        amount: m.amount,
+                        currency_iso_code: m.currency,
                     }))
                 };
 
@@ -257,28 +262,102 @@ export function extractCountryCode(bodyText, bodyHtml) {
 }
 
 
-export function extractTotalEarningsUSD(bodyText, bodyHtml) {
+// utils/extractTotalEarnings.js
+export function extractTotalEarnings(bodyText, bodyHtml) {
     // 1) Normaliza a texto plano
     const plain = (bodyText && bodyText.trim().length) ?
         bodyText :
         (bodyHtml ? bodyHtml.replace(/<[^>]+>/g, ' ') : '');
-
     if (!plain) return null;
 
-    // 2) Reduce el scope al bloque PRICE DETAILS si existe (evita falsos positivos)
+    // 2) Acota al bloque PRICE DETAILS (si existe)
     const lower = plain.toLowerCase();
     const start = lower.indexOf('price details');
     const scope = start !== -1 ? plain.slice(start, start + 2000) : plain;
 
-    // 3) Extrae Total Earnings (USD) admitiendo: "Total Earnings (USD): $412.13"
-    //    También soporta signo negativo o paréntesis contables: ($412.13)
-    const re = /Total\s*Earnings(?:\s*\(\s*USD\s*\))?\s*:\s*(\()?[-–—]?\s*\$?\s*([\d,]+(?:\.\d{2})?)\)?/i;
+    // 3) Regex: "Total Earnings (USD): $412.13" (soporta paréntesis negativos)
+    const re = /Total\s*Earnings(?:\s*\(\s*([^)]+?)\s*\))?\s*:\s*(\()?[-–—]?\s*(US\$|CA\$|AU\$|NZ\$|R\$|S\/|€|£|\$)?\s*([\d.,\s]+)\)?/i;
     const m = scope.match(re);
     if (!m) return null;
 
-    const isParenNeg = Boolean(m[1]);
-    const val = parseFloat(m[2].replace(/,/g, ''));
-    if (Number.isNaN(val)) return null;
+    const currencyFromParens = m[1]?.trim();
+    const isParenNeg = Boolean(m[2]);
+    const symbol = m[3] ? m[3].toUpperCase() : null;
+    const rawAmount = (m[4] || '').trim();
 
-    return isParenNeg ? -val : val;
+    // 4) Parseo robusto de monto (soporta US y EU)
+    const parseAmount = (s) => {
+        let v = s.replace(/\s/g, '');
+        if (v.includes(',') && v.includes('.')) {
+            // Decide decimal por el último separador visto
+            if (v.lastIndexOf(',') > v.lastIndexOf('.')) {
+                v = v.replace(/\./g, '').replace(',', '.'); // 1.234,56 -> 1234.56
+            } else {
+                v = v.replace(/,/g, ''); // 1,234.56 -> 1234.56
+            }
+        } else if (v.includes(',') && !v.includes('.')) {
+            v = v.replace(',', '.'); // 1234,56 -> 1234.56
+        } else if ((v.match(/\./g) || []).length > 1) {
+            // Múltiples puntos: último es decimal
+            const parts = v.split('.');
+            const dec = parts.pop();
+            v = parts.join('') + '.' + dec;
+        }
+        const n = parseFloat(v);
+        return Number.isNaN(n) ? null : n;
+    };
+
+    let amount = parseAmount(rawAmount);
+    if (amount == null) return null;
+    if (isParenNeg) amount = -amount;
+
+    // 5) Detección de currency
+    const CODE_MAP = {
+        USD: 'USD',
+        EUR: 'EUR',
+        GBP: 'GBP',
+        MXN: 'MXN',
+        CAD: 'CAD',
+        AUD: 'AUD',
+        NZD: 'NZD',
+        BRL: 'BRL',
+        PEN: 'PEN',
+        JPY: 'JPY',
+        CNY: 'CNY',
+        INR: 'INR',
+        COP: 'COP',
+        CLP: 'CLP',
+        ARS: 'ARS',
+        CHF: 'CHF'
+    };
+    const SYMBOL_MAP = {
+        'US$': 'USD',
+        'CA$': 'CAD',
+        'AU$': 'AUD',
+        'NZ$': 'NZD',
+        'R$': 'BRL',
+        'S/': 'PEN',
+        '$': 'USD',
+        '€': 'EUR',
+        '£': 'GBP'
+    };
+
+    let currency = null;
+
+    if (currencyFromParens) {
+        const code = currencyFromParens.replace(/[^A-Za-z]/g, '').toUpperCase();
+        if (CODE_MAP[code]) currency = CODE_MAP[code];
+        else if (/^[A-Z]{2,4}$/.test(code)) currency = code; // acepta códigos no mapeados
+    }
+
+    if (!currency && symbol) {
+        // Normaliza símbolos tipo 'us$'
+        const symNorm = symbol.toUpperCase();
+        currency = SYMBOL_MAP[symNorm] || SYMBOL_MAP[symNorm.replace(/\s+/g, '')] || null;
+    }
+
+    return {
+        amount,
+        currency
+    };
 }
