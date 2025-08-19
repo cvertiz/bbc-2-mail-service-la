@@ -118,8 +118,16 @@ export async function fetchBodiesByUids({
                     source: true
                 })) {
                     const parsed = await simpleParser(msg.source);
-                    const itemReference = extractItemReference(parsed.text, parsed.html);
+                    const {
+                        itemReference,
+                        listingId
+                    } = extractItemIdentifiers(parsed.text, parsed.html);
+                    const {
+                        customerName,
+                        shippingAddress,
+                    } = extractShippingDetails(parsed.text, parsed.html); // ← nuevo
                     const countryCode = extractCountryCode(parsed.text, parsed.html);
+
                     const {
                         amount,
                         currency
@@ -136,6 +144,9 @@ export async function fetchBodiesByUids({
                             html: parsed.html || null
                         },
                         itemReference,
+                        listingId,
+                        customerName,
+                        shippingAddress,
                         countryCode,
                         amount,
                         currency,
@@ -165,6 +176,9 @@ export async function fetchBodiesByUids({
                     messages: ordered.map(m => ({
                         uid: m.uid,
                         itemReference: m.itemReference,
+                        order_id: m.listingId,
+                        customerName: m.customerName,
+                        shippingAddress: m.shippingAddress,
                         countryCode: m.countryCode,
                         amount: m.amount,
                         currency_iso_code: m.currency,
@@ -182,26 +196,40 @@ export async function fetchBodiesByUids({
     throw lastErr;
 }
 
-// utils/extractTotalEarningsUSD.js
-export function extractItemReference(bodyText, bodyHtml) {
-    // Normaliza a texto plano
-    const plain = (bodyText && bodyText.trim().length) ?
+function toPlain(bodyText, bodyHtml) {
+    return (bodyText && bodyText.trim().length) ?
         bodyText :
         (bodyHtml ? bodyHtml.replace(/<[^>]+>/g, ' ') : '');
+}
+
+// utils/extractTotalEarningsUSD.js
+export function extractItemIdentifiers(bodyText, bodyHtml) {
+    // Normaliza a texto plano
+    const plain = toPlain(bodyText, bodyHtml);
     if (!plain) return null;
 
     // Busca "Item Reference:" (tolera saltos de línea y espacios)
     // Ej: "Item Reference:\nABB4838" → devuelve ABB4838
     const re = /Item\s*Reference\s*:?\s*([\r\n\t ]*)([A-Za-z0-9][A-Za-z0-9\-_.\/]*)/i;
-    const m = plain.match(re);
-    return m ? m[2] : null;
+    const refMatch = plain.match(re);
+    const itemReference = refMatch ? refMatch[2].trim() : null;
+
+    // Listing ID: "Listing ID: 82450269" (acepta "ListingID" sin espacio)
+    const idRe = /Listing\s*ID|ListingID/i.test(plain) ?
+        /(Listing\s*ID|ListingID)\s*:?\s*([\r\n\t ]*)([A-Za-z0-9._\-]+)/i :
+        null;
+    const idMatch = idRe ? plain.match(idRe) : null;
+    const listingId = idMatch ? idMatch[3].trim() : null;
+
+    return {
+        itemReference,
+        listingId
+    };
 }
 
 export function extractCountryCode(bodyText, bodyHtml) {
     // Convierte a texto plano
-    const plain = (bodyText && bodyText.trim().length) ?
-        bodyText :
-        (bodyHtml ? bodyHtml.replace(/<[^>]+>/g, ' ') : '');
+    const plain = toPlain(bodyText, bodyHtml);
     if (!plain) return null;
 
     // Aísla el bloque SHIPPING DETAILS
@@ -261,13 +289,60 @@ export function extractCountryCode(bodyText, bodyHtml) {
     return map[normalized] || null;
 }
 
+export function extractShippingDetails(bodyText, bodyHtml) {
+    // 1) Normaliza a texto plano
+    const plain = toPlain(bodyText, bodyHtml);
+    if (!plain) return null;
+
+    // 2) Acota al bloque SHIPPING DETAILS
+    const lower = plain.toLowerCase();
+    const startIdx = lower.indexOf('shipping details');
+    if (startIdx === -1) return null;
+
+    const scoped = plain.slice(startIdx);
+    const endMarkers = [
+        'price details',
+        'shipping instructions',
+        'get label',
+        'more questions',
+        'contact support'
+    ];
+
+    let endIdx = scoped.length;
+    for (const m of endMarkers) {
+        const i = scoped.toLowerCase().indexOf(m);
+        if (i !== -1) endIdx = Math.min(endIdx, i);
+    }
+    const block = scoped.slice(0, endIdx);
+
+    // 3) Parte en líneas útiles
+    const lines = block
+        .split(/\r?\n+/)
+        .map(s => s.trim().replace(/[,;.\s]+$/g, '').trim()) // limpia cola
+        .filter(Boolean);
+
+    // Elimina la cabecera "SHIPPING DETAILS"
+    if (lines.length && /^shipping\s*details:?$/i.test(lines[0])) {
+        lines.shift();
+    }
+    if (!lines.length) return null;
+    console.log("shipping lines: ", lines);
+
+    const customerName = lines[1];
+    const addressLines = lines.slice(2);
+    const shippingAddress = addressLines.join(', ');
+    console.log("customerName: ", customerName);
+    console.log("shippingAddress: ", shippingAddress);
+    return {
+        customerName,
+        shippingAddress
+    };
+}
 
 // utils/extractTotalEarnings.js
 export function extractTotalEarnings(bodyText, bodyHtml) {
     // 1) Normaliza a texto plano
-    const plain = (bodyText && bodyText.trim().length) ?
-        bodyText :
-        (bodyHtml ? bodyHtml.replace(/<[^>]+>/g, ' ') : '');
+    const plain = toPlain(bodyText, bodyHtml);
     if (!plain) return null;
 
     // 2) Acota al bloque PRICE DETAILS (si existe)

@@ -140,37 +140,27 @@ export async function processOrder(order) {
     console.log("exchange_currency_to_eur: ", exchange_currency_to_eur);
     console.log("exchange_to_usd: ", exchange_to_usd);
 
-    //     console.log("order.customer: ", order.customer);
-    //     console.log(
-    //         "order.customer.shipping_address: ",
-    //         order.customer.shipping_address
-    //     );
+        console.log("order.customer: ", order.customerName);
+        console.log(
+            "order.shippingAddress: ",
+            order.shippingAddress
+        );
 
-    //     const line_1 = `${order.customer?.shipping_address?.street_1 ?? ""} ${
-    //     order.customer?.shipping_address?.street_2 ?? ""
-    //   }`;
-    //     const line_2 = `${order.customer?.shipping_address?.state ?? ""} ${
-    //     order.customer?.shipping_address?.zip_code ?? ""
-    //   } ${order.customer?.shipping_address?.city ?? ""}   ${
-    //     order.customer?.shipping_address?.country_iso_code ?? ""
-    //   }`;
-    //     const line_3 = `${order.customer?.shipping_address?.phone ?? ""}`;
-
-    //     const salesOrderHeader = [
-    //         order.order_id, //sales_order_code:
-    //         `${order.customer.billing_address.firstname} ${order.customer.billing_address.lastname}`, //customer_name:
-    //         order.created_date, //posting_date:
-    //         null, //expiration_date:
-    //         order.created_date, //order_date:
-    //         line_1 + " \r\n " + line_2 + " \r\n " + line_3, //ship_to_code:
-    //         line_1 + " \r\n " + line_2 + " \r\n " + line_3, //pay_to_code:
-    //         order.order_id, //order_key:
-    //         "P", //status_code:
-    //         //order.createdAt,
-    //         // market_place_id: "93a7822a-ae8d-4602-bb8a-6d7daa789387"
-    //         order.order_id, //purchase_order_code:
-    //         locationCardCode, //card_code
-    //     ];
+        const salesOrderHeader = [
+            order.order_id, //sales_order_code:
+            `${order.customerName}`, //customer_name:
+            // order.created_date, //posting_date:
+            null, //expiration_date:
+            // order.created_date, //order_date:
+            shippingAddress, //ship_to_code:
+            shippingAddress, //pay_to_code:
+            order.order_id, //order_key:
+            "P", //status_code:
+            //order.createdAt,
+            // market_place_id: "93a7822a-ae8d-4602-bb8a-6d7daa789387"
+            order.order_id, //purchase_order_code:
+            locationCardCode, //card_code
+        ];
 
     //     console.log("SALES ORDER HEADER: ", salesOrderHeader);
 
