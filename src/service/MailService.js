@@ -175,6 +175,7 @@ export async function fetchBodiesByUids({
                     count: ordered.length,
                     messages: ordered.map(m => ({
                         uid: m.uid,
+                        date: m.date,
                         itemReference: m.itemReference,
                         order_id: m.listingId,
                         customerName: m.customerName,

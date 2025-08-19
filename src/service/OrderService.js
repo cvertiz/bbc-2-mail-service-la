@@ -149,11 +149,11 @@ export async function processOrder(order) {
         const salesOrderHeader = [
             order.order_id, //sales_order_code:
             `${order.customerName}`, //customer_name:
-            // order.created_date, //posting_date:
+            order.date, //posting_date:
             null, //expiration_date:
-            // order.created_date, //order_date:
-            shippingAddress, //ship_to_code:
-            shippingAddress, //pay_to_code:
+            order.date, //order_date:
+            order.shippingAddress, //ship_to_code:
+            order.shippingAddress, //pay_to_code:
             order.order_id, //order_key:
             "P", //status_code:
             //order.createdAt,
@@ -162,7 +162,7 @@ export async function processOrder(order) {
             locationCardCode, //card_code
         ];
 
-    //     console.log("SALES ORDER HEADER: ", salesOrderHeader);
+        console.log("SALES ORDER HEADER: ", salesOrderHeader);
 
     //     console.log("order.order_lines: ", order.order_lines);
 
