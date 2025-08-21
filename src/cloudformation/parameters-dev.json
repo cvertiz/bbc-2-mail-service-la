@@ -1,7 +1,7 @@
 [
   {
     "ParameterKey": "FUNCTIONNAME",
-    "ParameterValue": "bbc-shop-premiun-outlet-job-la"
+    "ParameterValue": "bbc-grailed-job-la"
   },
   {
     "ParameterKey": "HANDLER",
@@ -29,15 +29,15 @@
   },
   {
     "ParameterKey": "EVENTBRIDGE",
-    "ParameterValue": "bbc-shop-premiun-outlet-job-eb"
+    "ParameterValue": "bbc-grailed-job-eb"
   },
   {
     "ParameterKey": "SNSTOPIC",
-    "ParameterValue": "bbc-shop-premiun-outlet-sns"
+    "ParameterValue": "bbc-grailed-sns"
   },
   {
     "ParameterKey": "SQSNAME",
-    "ParameterValue": "bbc-shop-premiun-outlet-sqs"
+    "ParameterValue": "bbc-grailed-sqs"
   },
   {
     "ParameterKey": "SQSPULL",
