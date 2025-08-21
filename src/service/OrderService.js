@@ -165,18 +165,18 @@ export async function processOrder(order) {
     );
 
     const salesOrderHeader = [
-        '82450268',// order.order_id, //sales_order_code:
+        order.order_id, //sales_order_code:
         `${order.customerName}`, //customer_name:
         order.date, //posting_date:
         null, //expiration_date:
         order.date, //order_date:
         order.shippingAddress, //ship_to_code:
         order.shippingAddress, //pay_to_code:
-        '82450268', // order.order_id, //order_key:
+        order.order_id, //order_key:
         "P", //status_code:
         //order.createdAt,
         // marketplaceId, // market_place_id: "93a7822a-ae8d-4602-bb8a-6d7daa789387"
-        '82450268', // order.order_id, //purchase_order_code:
+        order.order_id, //purchase_order_code:
         locationCardCode, //card_code
     ];
 
@@ -185,8 +185,8 @@ export async function processOrder(order) {
     //     console.log("order.order_lines: ", order.order_lines);
 
     //TODO DESCOMENTAR PARA SKU REAL
-    // const order_sku = order.itemReference;
-    const order_sku = '1058A';
+    const order_sku = order.itemReference;
+    // const order_sku = 'ABA4493';
 
     const product = await findProductSalesOrder(
         order_sku,
@@ -244,40 +244,15 @@ export async function processOrder(order) {
             console.log("salesOrderHeader: ", ...salesOrderHeader);
             console.log("result: ", result.rows[0]);
 
-             const product = await findProductSalesOrder(
-                 order_sku,
-                 marketplaceId
-             );
-             console.log("product: ", product);
-             if (product.length > 0) {
-                 await callSQSMarketplace(product[0].product_id, marketplaceId);
-             }
+            const product = await findProductSalesOrder(
+                order_sku,
+                marketplaceId
+            );
+            console.log("product: ", product);
+
         } catch (error) {
             console.error("Error executing query", error);
             // Handle query execution errors
         }
-    }
-}
-
-async function callSQSMarketplace(productId, marketplaceId) {
-    let sqsClient = new SQSClient();
-
-    let params = {
-        MessageBody: JSON.stringify({
-            product_id: productId,
-            marketplace_id: marketplaceId,
-        }),
-        QueueUrl: process.env.SQSPULL, //'https://sqs.us-east-2.amazonaws.com/418334950001/bbc-pull-marketplaces-sqs'
-    };
-
-    try {
-        console.log("Enviando SQS orquestador");
-        let command = new SendMessageCommand(params);
-
-        await sqsClient.send(command);
-        console.log("SQS orquestador ejecutado");
-    } catch (error) {
-        console.error("Error calling validation function", error);
-        //handleValidationErrors(error);
     }
 }

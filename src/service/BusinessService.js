@@ -178,7 +178,11 @@ async function processOrder(order, marketplaceId) {
           warehouseCode = "'" + product[0].warehouse_id + "'";
         }
 
-        detailItem = `(${product[0].product_id}, '${order_sku}','${order.order_lines[0].quantity}', ${dPrice_ConvertUSD}, 'P', ${warehouseCode}, ${dPrice_EUR}, ${oPriceTotal}, '${order.currency_iso_code}', ${locationVat})`;
+        detailItem = `(${product[0].product_id}, '${order_sku}',
+        '${order.order_lines[0].quantity}', 
+        ${dPrice_ConvertUSD}, 'P',
+         ${warehouseCode}, ${dPrice_EUR}, ${oPriceTotal}, 
+         '${order.currency_iso_code}', ${locationVat})`;
         console.log("detailItem: ", detailItem);
       }
 
