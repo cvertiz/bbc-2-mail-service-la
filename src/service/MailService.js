@@ -1,4 +1,3 @@
-// src/service/MailService.js
 import {
     ImapFlow
 } from 'imapflow';
@@ -52,7 +51,7 @@ export async function searchEmailUids({
             const lock = await client.getMailboxLock(mailbox);
             try {
                 const uids = await client.search(Object.keys(criteria).length ? criteria : {});
-                const selected = limit ? uids.slice(-Number(limit)) : uids; // últimos N
+                const selected = limit ? uids.slice(-Number(limit)) : uids;
                 return {
                     host,
                     mailbox,
@@ -71,7 +70,6 @@ export async function searchEmailUids({
     throw lastErr;
 }
 
-/** 2) Con un conjunto de UIDs, traer envelope + body (sin marcar leído) */
 export async function fetchBodiesByUids({
     uids = [],
     mailbox = 'INBOX',
@@ -110,7 +108,6 @@ export async function fetchBodiesByUids({
             try {
                 const messages = [];
 
-                // fetch acepta array de UIDs; usa BODY.PEEK[] (via source) → no marca \Seen
                 for await (const msg of client.fetch(uids, {
                     envelope: true,
                     internalDate: true,
@@ -125,7 +122,7 @@ export async function fetchBodiesByUids({
                     const {
                         customerName,
                         shippingAddress,
-                    } = extractShippingDetails(parsed.text, parsed.html); // ← nuevo
+                    } = extractShippingDetails(parsed.text, parsed.html);
                     const countryCode = extractCountryCode(parsed.text, parsed.html);
 
                     const {
@@ -165,7 +162,6 @@ export async function fetchBodiesByUids({
                     }
                 }
 
-                // Ordena como los uids solicitados
                 const byUid = new Map(messages.map(m => [m.uid, m]));
                 const ordered = uids.map(u => byUid.get(u)).filter(Boolean);
 
@@ -203,19 +199,14 @@ function toPlain(bodyText, bodyHtml) {
         (bodyHtml ? bodyHtml.replace(/<[^>]+>/g, ' ') : '');
 }
 
-// utils/extractTotalEarningsUSD.js
 export function extractItemIdentifiers(bodyText, bodyHtml) {
-    // Normaliza a texto plano
     const plain = toPlain(bodyText, bodyHtml);
     if (!plain) return null;
 
-    // Busca "Item Reference:" (tolera saltos de línea y espacios)
-    // Ej: "Item Reference:\nABB4838" → devuelve ABB4838
     const re = /Item\s*Reference\s*:?\s*([\r\n\t ]*)([A-Za-z0-9][A-Za-z0-9\-_.\/]*)/i;
     const refMatch = plain.match(re);
     const itemReference = refMatch ? refMatch[2].trim() : null;
 
-    // Listing ID: "Listing ID: 82450269" (acepta "ListingID" sin espacio)
     const idRe = /Listing\s*ID|ListingID/i.test(plain) ?
         /(Listing\s*ID|ListingID)\s*:?\s*([\r\n\t ]*)([A-Za-z0-9._\-]+)/i :
         null;
@@ -229,11 +220,9 @@ export function extractItemIdentifiers(bodyText, bodyHtml) {
 }
 
 export function extractCountryCode(bodyText, bodyHtml) {
-    // Convierte a texto plano
     const plain = toPlain(bodyText, bodyHtml);
     if (!plain) return null;
 
-    // Aísla el bloque SHIPPING DETAILS
     const lower = plain.toLowerCase();
     const startIdx = lower.indexOf('shipping details');
     const scoped = startIdx !== -1 ? plain.slice(startIdx) : plain;
@@ -246,17 +235,14 @@ export function extractCountryCode(bodyText, bodyHtml) {
     }
     const block = scoped.slice(0, endIdx);
 
-    // Toma la última línea no vacía como candidato a país
     const lines = block.split(/\r?\n+/).map(s => s.trim()).filter(Boolean);
     if (lines.length && /^shipping details$/i.test(lines[0])) lines.shift();
     if (!lines.length) return null;
 
     let candidate = lines[lines.length - 1].replace(/[,.;]+$/g, '').trim();
 
-    // Si ya es un código de 2 letras en mayúsculas, úsalo
     if (/^[A-Z]{2}$/.test(candidate)) return candidate;
 
-    // Mapeo común nombre → ISO-2
     const map = {
         'us': 'US',
         'usa': 'US',
@@ -291,11 +277,9 @@ export function extractCountryCode(bodyText, bodyHtml) {
 }
 
 export function extractShippingDetails(bodyText, bodyHtml) {
-    // 1) Normaliza a texto plano
     const plain = toPlain(bodyText, bodyHtml);
     if (!plain) return null;
 
-    // 2) Acota al bloque SHIPPING DETAILS
     const lower = plain.toLowerCase();
     const startIdx = lower.indexOf('shipping details');
     if (startIdx === -1) return null;
@@ -316,13 +300,11 @@ export function extractShippingDetails(bodyText, bodyHtml) {
     }
     const block = scoped.slice(0, endIdx);
 
-    // 3) Parte en líneas útiles
     const lines = block
         .split(/\r?\n+/)
-        .map(s => s.trim().replace(/[,;.\s]+$/g, '').trim()) // limpia cola
+        .map(s => s.trim().replace(/[,;.\s]+$/g, '').trim())
         .filter(Boolean);
 
-    // Elimina la cabecera "SHIPPING DETAILS"
     if (lines.length && /^shipping\s*details:?$/i.test(lines[0])) {
         lines.shift();
     }
@@ -340,18 +322,14 @@ export function extractShippingDetails(bodyText, bodyHtml) {
     };
 }
 
-// utils/extractTotalEarnings.js
 export function extractTotalEarnings(bodyText, bodyHtml) {
-    // 1) Normaliza a texto plano
     const plain = toPlain(bodyText, bodyHtml);
     if (!plain) return null;
 
-    // 2) Acota al bloque PRICE DETAILS (si existe)
     const lower = plain.toLowerCase();
     const start = lower.indexOf('price details');
     const scope = start !== -1 ? plain.slice(start, start + 2000) : plain;
 
-    // 3) Regex: "Total Earnings (USD): $412.13" (soporta paréntesis negativos)
     const re = /Total\s*Earnings(?:\s*\(\s*([^)]+?)\s*\))?\s*:\s*(\()?[-–—]?\s*(US\$|CA\$|AU\$|NZ\$|R\$|S\/|€|£|\$)?\s*([\d.,\s]+)\)?/i;
     const m = scope.match(re);
     if (!m) return null;
@@ -361,20 +339,17 @@ export function extractTotalEarnings(bodyText, bodyHtml) {
     const symbol = m[3] ? m[3].toUpperCase() : null;
     const rawAmount = (m[4] || '').trim();
 
-    // 4) Parseo robusto de monto (soporta US y EU)
     const parseAmount = (s) => {
         let v = s.replace(/\s/g, '');
         if (v.includes(',') && v.includes('.')) {
-            // Decide decimal por el último separador visto
             if (v.lastIndexOf(',') > v.lastIndexOf('.')) {
-                v = v.replace(/\./g, '').replace(',', '.'); // 1.234,56 -> 1234.56
+                v = v.replace(/\./g, '').replace(',', '.');
             } else {
-                v = v.replace(/,/g, ''); // 1,234.56 -> 1234.56
+                v = v.replace(/,/g, '');
             }
         } else if (v.includes(',') && !v.includes('.')) {
-            v = v.replace(',', '.'); // 1234,56 -> 1234.56
+            v = v.replace(',', '.'); 
         } else if ((v.match(/\./g) || []).length > 1) {
-            // Múltiples puntos: último es decimal
             const parts = v.split('.');
             const dec = parts.pop();
             v = parts.join('') + '.' + dec;
@@ -387,7 +362,6 @@ export function extractTotalEarnings(bodyText, bodyHtml) {
     if (amount == null) return null;
     if (isParenNeg) amount = -amount;
 
-    // 5) Detección de currency
     const CODE_MAP = {
         USD: 'USD',
         EUR: 'EUR',
@@ -423,11 +397,10 @@ export function extractTotalEarnings(bodyText, bodyHtml) {
     if (currencyFromParens) {
         const code = currencyFromParens.replace(/[^A-Za-z]/g, '').toUpperCase();
         if (CODE_MAP[code]) currency = CODE_MAP[code];
-        else if (/^[A-Z]{2,4}$/.test(code)) currency = code; // acepta códigos no mapeados
+        else if (/^[A-Z]{2,4}$/.test(code)) currency = code;
     }
 
     if (!currency && symbol) {
-        // Normaliza símbolos tipo 'us$'
         const symNorm = symbol.toUpperCase();
         currency = SYMBOL_MAP[symNorm] || SYMBOL_MAP[symNorm.replace(/\s+/g, '')] || null;
     }
@@ -436,4 +409,44 @@ export function extractTotalEarnings(bodyText, bodyHtml) {
         amount,
         currency
     };
+}
+
+export async function markEmailAsRead(uid,
+    user = process.env.EMAIL_USER,
+    pass = process.env.EMAIL_PASS,
+    port = Number(process.env.IMAP_PORT || 993),
+    secure = true) {
+    for (const host of HOSTS) {
+        try {
+            const client = new ImapFlow({
+                host,
+                port,
+                secure,
+                auth: {
+                    user,
+                    pass
+                },
+                tls: {
+                    minVersion: 'TLSv1.2'
+                },
+                logger: false
+            });
+            await client.connect();
+            const lock = await client.getMailboxLock('INBOX');
+
+            try {
+                await client.messageFlagsAdd({
+                    uid
+                }, ['\\Seen']);
+                console.log(`Correo con UID ${uid} marcado como leído.`);
+            } catch (error) {
+                console.error(`Error al marcar el correo con UID ${uid} como leído:`, error);
+            } finally {
+                lock.release();
+                await client.logout();
+            }
+        } catch (error) {
+            console.error("Error al conectar al servidor IMAP:", error);
+        }
+    }
 }

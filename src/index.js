@@ -4,7 +4,8 @@ import {
 } from "./config/DbConnection.js";
 import {
   searchEmailUids,
-  fetchBodiesByUids
+  fetchBodiesByUids, 
+  markEmailAsRead
 } from './service/MailService.js';
 import {
   processOrder
@@ -32,13 +33,12 @@ export const handler = async (event, context, callback) => {
       },
     });
 
-    // 2) Con esos UIDs, trae cada body
     const {
       messages
     } = await fetchBodiesByUids({
       uids,
       mailbox: 'INBOX',
-      markSeen: false // no los marques como leídos
+      markSeen: false 
     });
     console.log("messages: ", messages);
 
@@ -46,7 +46,8 @@ export const handler = async (event, context, callback) => {
       for (let i = 0; i < messages.length; i++) {
         console.log(`Procesando orden ${i + 1} de ${messages.length}:`, messages[i]);
         try {
-          processOrder(messages[i]);
+          await processOrder(messages[i]);
+          await markEmailAsRead(messages[i].uid);
         } catch (error) {
           console.error(`Error al insertar orden ${i + 1}:`, error);
         }
