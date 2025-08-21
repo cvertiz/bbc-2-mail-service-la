@@ -1,12 +1,6 @@
-import ExcelJS from "exceljs";
-import axios from "axios";
 import {
     ConnectionInstance
 } from "../config/DbConnection.js";
-import {
-    SQSClient,
-    SendMessageCommand
-} from "@aws-sdk/client-sqs";
 
 const QET_DATA_INTEGRACION = `SELECT * from business.fn_get_settings_shop_premiun_outlet();`;
 
