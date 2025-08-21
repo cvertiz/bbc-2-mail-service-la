@@ -118,6 +118,24 @@ const getExchangeRate = async (fromCurrency, toCurrency) => {
     }
 };
 
+async function findProductSalesOrder(sku, marketplaceId) {
+    const queryStatement =
+        "SELECT * FROM business.fn_find_product_sales_order_service_auto($1, $2)";
+    const params = [sku, marketplaceId];
+
+    try {
+        const result = await ConnectionInstance.query(queryStatement, params);
+        return formatResultSetFrom(result);
+    } catch (error) {
+        console.error("Error calling validation function", error);
+        // Handle validation errors
+    }
+}
+
+function formatResultSetFrom(resultSet) {
+    return resultSet.rows.map((row) => row.data_set);
+}
+
 export async function processOrder(order) {
     const marketplaceId = await getMarketplaceId();
     const country_code = order.countryCode ?? null;
@@ -140,122 +158,126 @@ export async function processOrder(order) {
     console.log("exchange_currency_to_eur: ", exchange_currency_to_eur);
     console.log("exchange_to_usd: ", exchange_to_usd);
 
-        console.log("order.customer: ", order.customerName);
-        console.log(
-            "order.shippingAddress: ",
-            order.shippingAddress
-        );
+    console.log("order.customer: ", order.customerName);
+    console.log(
+        "order.shippingAddress: ",
+        order.shippingAddress
+    );
 
-        const salesOrderHeader = [
-            order.order_id, //sales_order_code:
-            `${order.customerName}`, //customer_name:
-            order.date, //posting_date:
-            null, //expiration_date:
-            order.date, //order_date:
-            order.shippingAddress, //ship_to_code:
-            order.shippingAddress, //pay_to_code:
-            order.order_id, //order_key:
-            "P", //status_code:
-            //order.createdAt,
-            // market_place_id: "93a7822a-ae8d-4602-bb8a-6d7daa789387"
-            order.order_id, //purchase_order_code:
-            locationCardCode, //card_code
-        ];
+    const salesOrderHeader = [
+        '82450268',// order.order_id, //sales_order_code:
+        `${order.customerName}`, //customer_name:
+        order.date, //posting_date:
+        null, //expiration_date:
+        order.date, //order_date:
+        order.shippingAddress, //ship_to_code:
+        order.shippingAddress, //pay_to_code:
+        '82450268', // order.order_id, //order_key:
+        "P", //status_code:
+        //order.createdAt,
+        // marketplaceId, // market_place_id: "93a7822a-ae8d-4602-bb8a-6d7daa789387"
+        '82450268', // order.order_id, //purchase_order_code:
+        locationCardCode, //card_code
+    ];
 
-        console.log("SALES ORDER HEADER: ", salesOrderHeader);
+    console.log("SALES ORDER HEADER: ", salesOrderHeader);
 
     //     console.log("order.order_lines: ", order.order_lines);
 
-    //     const salesOrderDetails = await Promise.all(
-    //         order.order_lines.map(async (orderDetail) => {
-    //             const processSku = orderDetail.offer_sku;
-    //             console.log("seller sku: ", processSku);
-    //             const firstLetters = processSku.substring(0, 3);
-    //             const lastNumbers = processSku.substring(processSku.length - 4);
-    //             const productSku = `${firstLetters}${lastNumbers}`;
-    //             console.log("final sku: ", productSku);
-    //             let detailItem = null;
+    //TODO DESCOMENTAR PARA SKU REAL
+    // const order_sku = order.itemReference;
+    const order_sku = '1058A';
 
-    //             const order_sku = productSku;
+    const product = await findProductSalesOrder(
+        order_sku,
+        marketplaceId
+    );
+    console.log("product: ", product);
+    let salesOrderDetails = [];
 
-    //             const product = await findProductSalesOrder(
-    //                 order_sku,
-    //                 marketplaceId
-    //             );
-    //             if (product.length > 0) {
-    //                 //console.log('currency: ', currency)
-    //                 //console.log('order.total_price: ', order.total_price)
-    //                 //console.log('exchange_currency_to_eur: ', exchange_currency_to_eur)
-    //                 //console.log('exchange_eur_to_usd: ', exchange_eur_to_usd)
+    if (product && product.length > 0) {
+        const oPriceTotal = Number(order.amount) || 0;
 
-    //                 const oPriceTotal =
-    //                     orderDetail.price -
-    //                     orderDetail.commission_fee +
-    //                     orderDetail.shipping_price;
+        const rateEur = Number(exchange_currency_to_eur) || 1; // evita div/0
+        const rateUsd = Number(exchange_to_usd) || 1;
 
-    //                 const dPrice_EUR = oPriceTotal / exchange_currency_to_eur;
-    //                 const dPrice_ConvertUSD = dPrice_EUR * exchange_to_usd;
+        const dPrice_EUR = +(oPriceTotal / rateEur).toFixed(2);
+        const dPrice_ConvertUSD = +(dPrice_EUR * rateUsd).toFixed(2);
 
-    //                 //console.log('Price_EUR: ', dPrice_EUR)
-    //                 //console.log('Price_USD: ', dPrice_ConvertUSD)
-    //                 let warehouseCode = null;
-    //                 if (product[0].warehouse_id) {
-    //                     warehouseCode = "'" + product[0].warehouse_id + "'";
-    //                 }
+        console.log("Price_EUR:", dPrice_EUR);
+        console.log("Price_USD:", dPrice_ConvertUSD);
 
-    //                 detailItem = `(${product[0].product_id}, '${order_sku}','${order.order_lines[0].quantity}', ${dPrice_ConvertUSD}, 'P', ${warehouseCode}, ${dPrice_EUR}, ${oPriceTotal}, '${order.currency_iso_code}', ${locationVat})`;
-    //                 console.log("detailItem: ", detailItem);
-    //             }
+        const warehouseCode = product[0].warehouse_id ?
+            `'${product[0].warehouse_id}'` :
+            'NULL'; // sin comillas => valor NULL en SQL
 
-    //             return detailItem;
-    //         })
-    //     );
+        const detailTuple =
+            `(${product[0].product_id}, '${order_sku}', 1, ${dPrice_ConvertUSD}, ` +
+            `'P', ${warehouseCode}, ${dPrice_EUR}, ${oPriceTotal}, ` +
+            `'${order.currency_iso_code}', ${locationVat == null ? 'NULL' : locationVat})`;
 
-    //     //console.log("detail items: ", salesOrderDetails);
+        salesOrderDetails.push(detailTuple);
+    }
 
-    //     const filteredDetails = salesOrderDetails.filter(
-    //         (element) => element !== null
-    //     );
+    const filteredDetails = salesOrderDetails.filter(
+        (element) => element !== null
+    );
 
-    //     if (filteredDetails.length > 0) {
-    //         const detailsValues = filteredDetails.join(",");
-    //         console.log("detailsValues", detailsValues);
-    //         const queryStatement = `
-    //             SELECT * FROM business.save_sales_order_full(
-    //                 $1,
-    //                 ROW($2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)::business.Type_SalesOrder_with_card,
-    //                 ARRAY[${detailsValues}]::business.Type_SalesOrderDetail_with_vat[]
-    //             );
-    //         `;
+    if (filteredDetails.length > 0) {
+        const detailsValues = filteredDetails.join(",");
+        console.log("detailsValues", detailsValues);
+        const queryStatement = `
+                SELECT * FROM business.save_sales_order_full(
+                    $1,
+                    ROW($2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)::business.Type_SalesOrder_with_card,
+                    ARRAY[${detailsValues}]::business.Type_SalesOrderDetail_with_vat[]
+                );
+            `;
+        console.log("queryStatement: ", queryStatement);
 
-    //         try {
-    //             const result = await ConnectionInstance.query(queryStatement, [
-    //                 marketplaceId,
-    //                 ...salesOrderHeader,
-    //             ]);
+        try {
+            const result = await ConnectionInstance.query(queryStatement, [
+                marketplaceId,
+                ...salesOrderHeader,
+            ]);
+            console.log("marketplaceId: ", marketplaceId);
+            console.log("salesOrderHeader: ", ...salesOrderHeader);
+            console.log("result: ", result.rows[0]);
 
-    //             if (result.rows[0].save_sales_order_full == 1) {
-    //                 await Promise.all(
-    //                     order.order_lines.map(async (orderDetail) => {
-    //                         const processSku = orderDetail.offer_sku;
-    //                         const firstLetters = processSku.substring(0, 3);
-    //                         const lastNumbers = processSku.substring(processSku.length - 4);
-    //                         const productSku = `${firstLetters}${lastNumbers}`;
-    //                         console.log("final sku SQS: ", productSku);
-    //                         const order_sku = productSku;
-    //                         const product = await findProductSalesOrder(
-    //                             order_sku,
-    //                             marketplaceId
-    //                         );
-    //                         if (product.length > 0) {
-    //                             await callSQSMarketplace(product[0].product_id, marketplaceId);
-    //                         }
-    //                     })
-    //                 );
-    //             }
-    //         } catch (error) {
-    //             console.error("Error executing query", error);
-    //             // Handle query execution errors
-    //         }
-    //     }
+             const product = await findProductSalesOrder(
+                 order_sku,
+                 marketplaceId
+             );
+             console.log("product: ", product);
+             if (product.length > 0) {
+                 await callSQSMarketplace(product[0].product_id, marketplaceId);
+             }
+        } catch (error) {
+            console.error("Error executing query", error);
+            // Handle query execution errors
+        }
+    }
+}
+
+async function callSQSMarketplace(productId, marketplaceId) {
+    let sqsClient = new SQSClient();
+
+    let params = {
+        MessageBody: JSON.stringify({
+            product_id: productId,
+            marketplace_id: marketplaceId,
+        }),
+        QueueUrl: process.env.SQSPULL, //'https://sqs.us-east-2.amazonaws.com/418334950001/bbc-pull-marketplaces-sqs'
+    };
+
+    try {
+        console.log("Enviando SQS orquestador");
+        let command = new SendMessageCommand(params);
+
+        await sqsClient.send(command);
+        console.log("SQS orquestador ejecutado");
+    } catch (error) {
+        console.error("Error calling validation function", error);
+        //handleValidationErrors(error);
+    }
 }
